@@ -1,11 +1,11 @@
-//MakerDaoFork.sol
+// SPDX-License-Identifier: MIT
 
-pragma solidity ^0.6.12;
+pragma solidity ^0.8.0;
 
 import "./fusd.sol";
-import "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts/release-v3.0.0/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MakerDaoFork is Ownable {
+contract ForceDao is Ownable {
     // Global system parameters
     uint256 public totalCollateral;
     uint256 public totalDebt;
@@ -23,6 +23,16 @@ contract MakerDaoFork is Ownable {
     event FUSDGenerated(address indexed user, uint256 amount);
     event CollateralUnlocked(address indexed user, uint256 amount);
     event FUSDRepaid(address indexed user, uint256 amount);
+
+
+    constructor(uint256 _stabilityFee, uint256 _liquidationRatio, uint256 _collateralizationRatio, uint256 _ethPrice) public {
+            admin = payable(msg.sender);
+        stabilityFee = _stabilityFee;
+        liquidationRatio = _liquidationRatio;
+        collateralizationRatio = _collateralizationRatio;
+        ethPrice = _ethPrice;
+    }
+
 
     // Lock collateral and generate FUSD
     function lockCollateral(uint256 amount) external {
@@ -61,31 +71,22 @@ contract MakerDaoFork is Ownable {
 
     // Set stability fee rate
     function setStabilityFee(uint256 rate) external onlyOwner {
-                stabilityFee = rate;
+        stabilityFee = rate;
     }
 
     // Set liquidation ratio
     function setLiquidationRatio(uint256 ratio) external onlyOwner {
-                liquidationRatio = ratio;
+        liquidationRatio = ratio;
     }
 
     // Set collateralization ratio
     function setCollateralizationRatio(uint256 ratio) public onlyOwner {
-                collateralizationRatio = ratio;
+        collateralizationRatio = ratio;
     }
 
     // Set ETH price
     function setEthPrice(uint256 price) external onlyOwner {
-        
         ethPrice = price;
     }
 
-    // Constructor
-    constructor(uint256 _stabilityFee, uint256 _liquidationRatio, uint256 _collateralizationRatio, uint256 _ethPrice) public {
-            admin = payable(msg.sender);
-        stabilityFee = _stabilityFee;
-        liquidationRatio = _liquidationRatio;
-        collateralizationRatio = _collateralizationRatio;
-        ethPrice = _ethPrice;
-    }
 }
