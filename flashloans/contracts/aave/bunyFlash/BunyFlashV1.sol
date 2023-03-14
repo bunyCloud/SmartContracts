@@ -8,20 +8,20 @@ import "./interfaces/ILendingPool.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/IERC20.sol";
 
-contract BunyFlashV1 is FlashLoanReceiverBase {
+
+contract BunyV1WethDai is FlashLoanReceiverBase {
     //--------------------------------------------------------------------
     // VARIABLES
 
     address public owner;
-
-    address public wethAddress;
+    address public wavaxAddress;
     address public daiAddress;
-    address public uniswapRouterAddress;
-    address public sushiswapRouterAddress;
+    address public traderjoeRouterAddress;
+    address public pangolinRouterAddress;
 
     enum Exchange {
-        UNI,
-        SUSHI,
+        JOE,
+        PAN,
         NONE
     }
 
@@ -38,18 +38,18 @@ contract BunyFlashV1 is FlashLoanReceiverBase {
 
     constructor(
         address _addressProvider,
-        address _uniswapRouterAddress,
-        address _sushiswapRouterAddress,
-        address _weth,
+        address _traderjoeRouterAddress,
+        address _pangolinRouterAddress,
+        address _wavax,
         address _dai
     )
         public
         FlashLoanReceiverBase(ILendingPoolAddressesProvider(_addressProvider))
     {
-        uniswapRouterAddress = _uniswapRouterAddress;
-        sushiswapRouterAddress = _sushiswapRouterAddress;
+        traderjoeRouterAddress = _traderjoeRouterAddress;
+        pangolinRouterAddress = _pangolinRouterAddress;
         owner = msg.sender;
-        wethAddress = _weth;
+        wavaxAddress = _wavax;
         daiAddress = _dai;
     }
 
@@ -58,36 +58,36 @@ contract BunyFlashV1 is FlashLoanReceiverBase {
 
     function deposit(uint256 amount) public onlyOwner {
         require(amount > 0, "Deposit amount must be greater than 0");
-        IERC20(wethAddress).transferFrom(msg.sender, address(this), amount);
+        IERC20(wavaxAddress).transferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(uint256 amount) public onlyOwner {
-        uint256 wethBalance = getERC20Balance(wethAddress);
-        require(amount <= wethBalance, "Not enough amount deposited");
-        IERC20(wethAddress).transferFrom(address(this), msg.sender, amount);
+        uint256 wavaxBalance = getERC20Balance(wavaxAddress);
+        require(amount <= wavaxBalance, "Not enough amount deposited");
+        IERC20(wavaxAddress).transferFrom(address(this), msg.sender, amount);
     }
 
     function makeArbitrage() public {
-        uint256 amountIn = getERC20Balance(wethAddress);
+        uint256 amountIn = getERC20Balance(wavaxAddress);
         Exchange result = _comparePrice(amountIn);
-        if (result == Exchange.UNI) {
-            // sell ETH in uniswap for DAI with high price and buy ETH from sushiswap with lower price
+        if (result == Exchange.JOE) {
+            // sell WAVAX in traderjoe for DAI with high price and buy WAVAX from pangolin with lower price
             uint256 amountOut = _swap(
                 amountIn,
-                uniswapRouterAddress,
-                wethAddress,
+                traderjoeRouterAddress,
+                wavaxAddress,
                 daiAddress
             );
-            _swap(amountOut, sushiswapRouterAddress, daiAddress, wethAddress);
-        } else if (result == Exchange.SUSHI) {
-            // sell ETH in sushiswap for DAI with high price and buy ETH from uniswap with lower price
+            _swap(amountOut, pangolinRouterAddress, daiAddress, wavaxAddress);
+        } else if (result == Exchange.PAN) {
+            // sell WAVAX in pangolin for DAI with high price and buy WAVAX from traderjoe with lower price
             uint256 amountOut = _swap(
                 amountIn,
-                sushiswapRouterAddress,
-                wethAddress,
+                pangolinRouterAddress,
+                wavaxAddress,
                 daiAddress
             );
-            _swap(amountOut, uniswapRouterAddress, daiAddress, wethAddress);
+            _swap(amountOut, traderjoeRouterAddress, daiAddress, wavaxAddress);
         }
     }
 
@@ -122,40 +122,40 @@ contract BunyFlashV1 is FlashLoanReceiverBase {
     }
 
     function _comparePrice(uint256 amount) internal view returns (Exchange) {
-        uint256 uniswapPrice = _getPrice(
-            uniswapRouterAddress,
-            wethAddress,
+        uint256 traderjoePrice = _getPrice(
+            traderjoeRouterAddress,
+            wavaxAddress,
             daiAddress,
             amount
         );
-        uint256 sushiswapPrice = _getPrice(
-            sushiswapRouterAddress,
-            wethAddress,
+        uint256 pangolinPrice = _getPrice(
+            pangolinRouterAddress,
+            wavaxAddress,
             daiAddress,
             amount
         );
 
-        // we try to sell ETH with higher price and buy it back with low price to make profit
-        if (uniswapPrice > sushiswapPrice) {
+        // we try to sell WAVAX with higher price and buy it back with low price to make profit
+        if (traderjoePrice > pangolinPrice) {
             require(
                 _checkIfArbitrageIsProfitable(
                     amount,
-                    uniswapPrice,
-                    sushiswapPrice
+                    traderjoePrice,
+                    pangolinPrice
                 ),
                 "Arbitrage not profitable"
             );
-            return Exchange.UNI;
-        } else if (uniswapPrice < sushiswapPrice) {
+            return Exchange.JOE;
+        } else if (traderjoePrice < pangolinPrice) {
             require(
                 _checkIfArbitrageIsProfitable(
                     amount,
-                    sushiswapPrice,
-                    uniswapPrice
+                    pangolinPrice,
+                    traderjoePrice
                 ),
                 "Arbitrage not profitable"
             );
-            return Exchange.SUSHI;
+            return Exchange.PAN;
         } else {
             return Exchange.NONE;
         }
@@ -166,10 +166,10 @@ contract BunyFlashV1 is FlashLoanReceiverBase {
         uint256 higherPrice,
         uint256 lowerPrice
     ) internal pure returns (bool) {
-        // uniswap & sushiswap have 0.3% fee for every exchange
+        // traderjoe & pangolin have 0.3% fee for every exchange
         // so gain made must be greater than 2 * 0.3% * arbitrage_amount
 
-        // difference in ETH
+        // difference in WAVAX
         uint256 difference = ((higherPrice - lowerPrice) * 10**18) /
             higherPrice;
 
@@ -296,3 +296,4 @@ contract BunyFlashV1 is FlashLoanReceiverBase {
         return IERC20(_erc20Address).balanceOf(address(this));
     }
 }
+        
