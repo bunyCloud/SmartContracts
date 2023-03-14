@@ -10,7 +10,6 @@ contract ForceDao is Ownable {
     uint256 public totalCollateral;
     uint256 public totalDebt;
     uint256 public stabilityFee;
-    uint256 public liquidationRatio;
     uint256 public collateralizationRatio;
     uint256 public ethPrice;
     address payable public admin;
@@ -25,10 +24,9 @@ contract ForceDao is Ownable {
     event FUSDRepaid(address indexed user, uint256 amount);
 
 
-    constructor(uint256 _stabilityFee, uint256 _liquidationRatio, uint256 _collateralizationRatio, uint256 _ethPrice) public {
+    constructor(uint256 _stabilityFee,  uint256 _collateralizationRatio, uint256 _ethPrice) public {
             admin = payable(msg.sender);
         stabilityFee = _stabilityFee;
-        liquidationRatio = _liquidationRatio;
         collateralizationRatio = _collateralizationRatio;
         ethPrice = _ethPrice;
     }
@@ -74,10 +72,7 @@ contract ForceDao is Ownable {
         stabilityFee = rate;
     }
 
-    // Set liquidation ratio
-    function setLiquidationRatio(uint256 ratio) external onlyOwner {
-        liquidationRatio = ratio;
-    }
+  
 
     // Set collateralization ratio
     function setCollateralizationRatio(uint256 ratio) public onlyOwner {
