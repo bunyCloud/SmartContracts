@@ -67,13 +67,7 @@ contract ForceDao is Ownable {
         emit FUSDRepaid(msg.sender, fusdAmount);
     }
 
-    // Set stability fee rate
-    function setStabilityFee(uint256 rate) external onlyOwner {
-        stabilityFee = rate;
-    }
-
-  
-
+ 
     // Set collateralization ratio
     function setCollateralizationRatio(uint256 ratio) public onlyOwner {
         collateralizationRatio = ratio;
