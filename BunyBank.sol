@@ -1,85 +1,86 @@
-// SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.0;
 
 interface ERC20 {
-function balanceOf(address account) external view returns (uint256);
-function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
 }
 
 contract BunyBank {
-address owner1;
-address owner2;
-mapping(address => uint256) tokenBalances1;
-mapping(address => uint256) tokenBalances2;
-string public ContractName = "Buny Bank Telos v1";
+    address public owner1;
+    address public owner2;
+    mapping(address => uint256) tokenBalances;
+    mapping(address => uint256) public owner1Balance;
+    mapping(address => uint256) public owner2Balance;
+    string public ContractName = "Buny Bank v1";
 
-event Deposit(address indexed account, uint256 amount);
-event Withdrawal(address indexed account, uint256 amount);
+    event Deposit(address indexed depositor, uint256 amount);
+    event Withdrawal(address indexed owner, uint256 amount);
 
-constructor() {
-    owner1 = msg.sender;
-    owner2 = address(0x1234567890123456789012345678901234567890); // Replace with the second owner's address
-}
+    constructor(address _owner1, address _owner2) {
+        owner1 = _owner1;
+        owner2 = _owner2;
+    }
 
-function deposit() public payable {
-    // Split the deposited tokens 50/50 into separate balance slots for owner1 and owner2
-    uint256 halfAmount = msg.value / 2;
-    tokenBalances1[msg.sender] += halfAmount;
-    tokenBalances2[msg.sender] += halfAmount;
+    function deposit() public payable {
+        require(msg.value > 0, "Deposit amount must be greater than 0.");
+        uint256 depositAmount = msg.value;
+        uint256 ownerShare = depositAmount / 2;
 
-    // Emit a Deposit event
-    emit Deposit(msg.sender, msg.value);
-}
+        owner1Balance[owner1] += ownerShare;
+        owner2Balance[owner2] += ownerShare;
 
-receive() external payable {}
+        emit Deposit(msg.sender, depositAmount);
+    }
 
-function withdraw(uint amount) public {
-    require(msg.sender == owner1 || msg.sender == owner2, "Only the owners can withdraw funds.");
-    require(amount <= address(this).balance, "Insufficient balance.");
-    // Split the withdrawn amount equally between owner1 and owner2
-    uint256 halfAmount = amount / 2;
-    payable(owner1).transfer(halfAmount);
-    payable(owner2).transfer(halfAmount);
+    receive() external payable {
+        deposit();
+    }
 
-    // Emit a Withdrawal event
-    emit Withdrawal(msg.sender, amount);
-}
+    function withdraw(uint256 amount) public {
+        require(msg.sender == owner1 || msg.sender == owner2, "Only the owner can withdraw funds.");
+        require(amount <= address(this).balance, "Insufficient balance.");
+        require(owner1Balance[owner1] >= amount / 2 && owner2Balance[owner2] >= amount / 2, "Insufficient owner balance.");
 
-function withdrawTo(address payable recipient, uint amount) public {
-    require(msg.sender == owner1 || msg.sender == owner2, "Only the owners can withdraw funds.");
-    require(amount <= address(this).balance, "Insufficient balance.");
-    // Split the withdrawn amount equally between owner1 and owner2
-    uint256 halfAmount = amount / 2;
-    recipient.transfer(halfAmount);
-    payable(owner1).transfer(halfAmount);
-    payable(owner2).transfer(halfAmount);
+        owner1Balance[owner1] -= amount / 2;
+        owner2Balance[owner2] -= amount / 2;
 
-    // Emit a Withdrawal event
-    emit Withdrawal(msg.sender, amount);
-}
+        emit Withdrawal(msg.sender, amount);
 
-function getBalance() public view returns(uint) {
-    return address(this).balance;
-}
+        payable(msg.sender).transfer(amount);
+    }
 
-function receive(address token, uint256 amount) public {
-    require(msg.sender == token, "Only the token contract can call this function.");
-    require(ERC20(token).transferFrom(msg.sender, address(this), amount), "Token transfer failed.");
-    // Split the received tokens 50/50 into separate balance slots for owner1 and owner2
-    uint256 halfAmount = amount / 2;
-    tokenBalances1[token] += halfAmount;
-    tokenBalances2[token] += halfAmount;
+    function withdrawTo(address payable recipient, uint256 amount) public {
+        require(msg.sender == owner1 || msg.sender == owner2, "Only the owner can withdraw funds.");
+        require(amount <= address(this).balance, "Insufficient balance.");
+        require(owner1Balance[owner1] >= amount / 2 && owner2Balance[owner2] >= amount / 2, "Insufficient owner balance.");
 
-    // Emit a Deposit event
-    emit Deposit(msg.sender, amount);
-}
+        owner1Balance[owner1] -= amount / 2;
+        owner2Balance[owner2] -= amount / 2;
 
-function getTokenBalance1(address token) public view returns (uint256) {
-    return tokenBalances1[token];
-}
+        emit Withdrawal(msg.sender, amount);
 
-function getTokenBalance2(address token) public view returns (uint256) {
-    return tokenBalances2[token];
-}
+        recipient.transfer(amount);
+    }
+
+    function getBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+
+    function receive(address token, uint256 amount) public {
+        require(msg.sender == token, "Only the token contract can call this function.");
+        require(ERC20(token).transferFrom(msg.sender, address(this), amount), "Token transfer failed.");
+        tokenBalances[token] += amount;
+    }
+
+    function getTokenBalance(address token) public view returns (uint256) {
+        return ERC20(token).balanceOf(address(this));
+    }
+
+    function getOwner1Balance() public view returns (uint256) {
+        return owner1Balance[owner1];
+    }
+
+    function getOwner2Balance() public view returns (uint256) {
+        return owner2Balance[owner2];
+    }
 }
