@@ -20,7 +20,7 @@ contract ForceDao is Ownable {
     uint256 public xautUSD;
     uint256 public timestampOflatestUSD; 
     // Global system parameters
-    uint256 public totalTelosCollateral;
+    uint256 public totalTLOSCollateral;
     uint256 public totalBTCCollateral;
     uint256 public totalEOSCollateral;
     uint256 public totalETHCollateral;
@@ -36,7 +36,7 @@ contract ForceDao is Ownable {
     mapping(address => uint256) public fusdBalances;
 
     // Events
-    event TelosCollateralLocked(address indexed user, uint256 amount);
+    event TLOSCollateralLocked(address indexed user, uint256 amount);
     event BTCCollateralLocked(address indexed user, uint256 amount);
     event EOSCollateralLocked(address indexed user, uint256 amount);
     event ETHCollateralLocked(address indexed user, uint256 amount);
@@ -46,7 +46,7 @@ contract ForceDao is Ownable {
 
 
     event FUSDGenerated(address indexed user, uint256 amount);
-    event TelosCollateralUnlocked(address indexed user, uint256 amount);
+    event TLOSCollateralUnlocked(address indexed user, uint256 amount);
     event BTCCollateralUnlocked(address indexed user, uint256 amount);
     event EOSCollateralUnlocked(address indexed user, uint256 amount);
     event ETHCollateralUnlocked(address indexed user, uint256 amount);
@@ -104,43 +104,101 @@ contract ForceDao is Ownable {
          }
     }
 
-    function lockTelosCollateral(uint256 amount) external {
+    function lockTLOSCollateral(uint256 amount) external {
     require(amount > 0, "Amount must be greater than zero");
     require(collateralBalances[msg.sender] + amount >= fusdBalances[msg.sender] * collateralizationRatio / 10000, "Collateralization ratio below minimum");
-    require(totalTelosCollateral + amount >= totalDebt * liquidationRatio / 10000, "Collateralization ratio below liquidation threshold");  
+    require(totalTLOSCollateral + amount >= totalDebt * liquidationRatio / 10000, "Collateralization ratio below liquidation threshold");  
     // Check TLOS price
-    uint256 tlosPrice = getTLOSUSD();
+    uint256 tlosUSD = getTLOSUSD();
     require(checkUSDAge(3600), "Price data too old");
     collateralBalances[msg.sender] += amount;
-    totalTelosCollateral += amount;
-        uint256 fusdAmount = (amount * tlosPrice) / 100;  // FUSD generated = (collateral * ETH price + collateral * BTC price + collateral * TLOS price) / 300
+    totalTLOSCollateral += amount;
+        uint256 fusdAmount = (amount * tlosUSD) / 100;  // FUSD generated = (collateral * ETH price + collateral * BTC price + collateral * TLOS price) / 300
     fusdBalances[msg.sender] += fusdAmount;
     totalDebt += fusdAmount;
-    emit TelosCollateralLocked(msg.sender, amount);
+    emit TLOSCollateralLocked(msg.sender, amount);
     emit FUSDGenerated(msg.sender, fusdAmount);
 }
 
-    // Unlock collateral and repay FUSD
-    function unlockTelosCollateral(uint256 amount) external {
+    function lockPAXGCollateral(uint256 amount) external {
+    require(amount > 0, "Amount must be greater than zero");
+    require(collateralBalances[msg.sender] + amount >= fusdBalances[msg.sender] * collateralizationRatio / 10000, "Collateralization ratio below minimum");
+    require(totalPAXGCollateral + amount >= totalDebt * liquidationRatio / 10000, "Collateralization ratio below liquidation threshold");  
+    // Check TLOS price
+    uint256 paxgUSD = getPAXGUSD();
+    require(checkUSDAge(3600), "Price data too old");
+    collateralBalances[msg.sender] += amount;
+    totalPAXGCollateral += amount;
+        uint256 fusdAmount = (amount * paxgUSD) / 100;  // FUSD generated = (collateral * ETH price + collateral * BTC price + collateral * TLOS price) / 300
+    fusdBalances[msg.sender] += fusdAmount;
+    totalDebt += fusdAmount;
+    emit PAXGCollateralLocked(msg.sender, amount);
+    emit FUSDGenerated(msg.sender, fusdAmount);
+}
+
+
+    function lockETHCollateral(uint256 amount) external {
+    require(amount > 0, "Amount must be greater than zero");
+    require(collateralBalances[msg.sender] + amount >= fusdBalances[msg.sender] * collateralizationRatio / 10000, "Collateralization ratio below minimum");
+    require(totalETHCollateral + amount >= totalDebt * liquidationRatio / 10000, "Collateralization ratio below liquidation threshold");  
+    // Check TLOS price
+    uint256 ethUSD = getETHUSD();
+    require(checkUSDAge(3600), "Price data too old");
+    collateralBalances[msg.sender] += amount;
+    totalETHCollateral += amount;
+        uint256 fusdAmount = (amount * ethUSD) / 100;  // FUSD generated = (collateral * ETH price + collateral * BTC price + collateral * TLOS price) / 300
+    fusdBalances[msg.sender] += fusdAmount;
+    totalDebt += fusdAmount;
+    emit ETHCollateralLocked(msg.sender, amount);
+    emit FUSDGenerated(msg.sender, fusdAmount);
+}
+
+
+    // Unlock TLOS collateral and repay FUSD
+    function unlockTLOSCollateral(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(amount <= collateralBalances[msg.sender], "Insufficient collateral balance");
+        uint256 fusdAmount = amount * tlosUSD / 100;  // FUSD to be repaid = collateral * ETH price / 100
+        require(fusdAmount <= fusdBalances[msg.sender], "Insufficient FUSD balance");
+        collateralBalances[msg.sender] -= amount;
+        totalTLOSCollateral -= amount;
+        fusdBalances[msg.sender] -= fusdAmount;
+        totalDebt -= fusdAmount;
+        emit TLOSCollateralUnlocked(msg.sender, amount);
+        emit FUSDRepaid(msg.sender, fusdAmount);
+    }
+
+    // Unlock ETH collateral
+    function unlockETHCollateral(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than zero");
+        require(amount <= collateralBalances[msg.sender], "Insufficient collateral balance");
+        uint256 fusdAmount = amount * ethUSD / 100;  // FUSD to be repaid = collateral * ETH price / 100
+        require(fusdAmount <= fusdBalances[msg.sender], "Insufficient FUSD balance");
+        collateralBalances[msg.sender] -= amount;
+        totalETHCollateral -= amount;
+        fusdBalances[msg.sender] -= fusdAmount;
+        totalDebt -= fusdAmount;
+        emit ETHCollateralUnlocked(msg.sender, amount);
+        emit FUSDRepaid(msg.sender, fusdAmount);
+    }
+
+    // Unlock PAXG collateral
+      function unlockPAXGCollateral(uint256 amount) external {
         require(amount > 0, "Amount must be greater than zero");
         require(amount <= collateralBalances[msg.sender], "Insufficient collateral balance");
 
-        uint256 fusdAmount = amount * ethUSD / 100;  // FUSD to be repaid = collateral * ETH price / 100
+        uint256 fusdAmount = amount * paxgUSD / 100;  // FUSD to be repaid = collateral * PAXG price / 100
         require(fusdAmount <= fusdBalances[msg.sender], "Insufficient FUSD balance");
 
         collateralBalances[msg.sender] -= amount;
-        totalTelosCollateral -= amount;
+        totalPAXGCollateral -= amount;
 
         fusdBalances[msg.sender] -= fusdAmount;
         totalDebt -= fusdAmount;
 
-        emit TelosCollateralUnlocked(msg.sender, amount);
+        emit PAXGCollateralUnlocked(msg.sender, amount);
         emit FUSDRepaid(msg.sender, fusdAmount);
     }
-
-
-
-
 
 
 
@@ -158,9 +216,6 @@ contract ForceDao is Ownable {
     liquidationRatio = 15000;
 }
 
-    // Set ETH price
-    function setethUSD(uint256 price) external onlyOwner {
-        ethUSD = price;
-    }
+  
 
 }
